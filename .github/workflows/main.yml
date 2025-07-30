@@ -22,7 +22,7 @@ jobs:
       - name: Download Qt MSBuild Tool
         run: |
           Invoke-WebRequest -Uri https://download.qt.io/official_releases/vsaddin/3.2.0/qt-vsaddin-msbuild-3.2.0-rev.47.zip -OutFile qtmsbuild.zip
-          Expand-Archive -Path qtmsbuild.zip -DestinationPath D:\a\PearlCannonHelper\PearlCannonHelper\qt\5.15.2\msvc2019_64\Tools\QtMsBuild
+          Expand-Archive -Path qtmsbuild.zip -DestinationPath D:\a\PearlCannonHelpers\PearlCannonHelpers\qt\5.15.2\msvc2019_64\Tools\QtMsBuild
           [System.Environment]::SetEnvironmentVariable('QtMsBuild', 'C:\QtMsBuild', [System.EnvironmentVariableTarget]::Process)
 
       - name: Setup MSBuild
@@ -41,7 +41,7 @@ jobs:
         run: |
           $qtDir = "D:\a\PearlCannonHelper\PearlCannonHelper\qt\5.15.2\msvc2019_64"
           $QtMsBuild = "$qtDir\Tools\QtMsBuild"
-          Add-Content -Path $env:GITHUB_PATH -Value "D:\a\PearlCannonHelper\PearlCannonHelper\qt\5.15.2\msvc2019_64\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "D:\a\PearlCannonHelpers\PearlCannonHelpers\qt\5.15.2\msvc2019_64\bin"
           "`nQTDIR=$qtDir"       | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "`nQt5_DIR=$qtDir"     | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "`nQtMsBuild=$QtMsBuild" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -54,15 +54,15 @@ jobs:
           msbuild PearlCannonHelper/PearlCannonHelper.vcxproj /p:Configuration=Release /p:Platform=x64 /p:QTDIR=${{ env.QTDIR }}
       - name: Deploy Qt runtime libraries with windeployqt
         run: |
-          & "$env:QTDIR\bin\windeployqt.exe" "D:\a\PearlCannonHelper\PearlCannonHelper\PearlCannonHelper\x64\Release\PearlCannonHelper.exe"
+          & "$env:QTDIR\bin\windeployqt.exe" "D:\a\PearlCannonHelpers\PearlCannonHelpers\PearlCannonHelper\x64\Release\PearlCannonHelper.exe"
       - name: Copy required Qt DLLs and folders manually
         run: |
-          Copy-Item -Path "$env:QTDIR\bin\Qt5Core.dll" -Destination "D:\a\PearlCannonHelper\PearlCannonHelper\PearlCannonHelper\x64\Release\" -Force
-          Copy-Item -Path "$env:QTDIR\bin\Qt5Gui.dll" -Destination "D:\a\PearlCannonHelper\PearlCannonHelper\PearlCannonHelper\x64\Release\" -Force
-          Copy-Item -Path "$env:QTDIR\bin\Qt5Widgets.dll" -Destination "D:\a\PearlCannonHelper\PearlCannonHelper\PearlCannonHelper\x64\Release\" -Force
+          Copy-Item -Path "$env:QTDIR\bin\Qt5Core.dll" -Destination "D:\a\PearlCannonHelpers\PearlCannonHelpers\PearlCannonHelper\x64\Release\" -Force
+          Copy-Item -Path "$env:QTDIR\bin\Qt5Gui.dll" -Destination "D:\a\PearlCannonHelpers\PearlCannonHelpers\PearlCannonHelper\x64\Release\" -Force
+          Copy-Item -Path "$env:QTDIR\bin\Qt5Widgets.dll" -Destination "D:\a\PearlCannonHelpers\PearlCannonHelpers\PearlCannonHelper\x64\Release\" -Force
           
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: PearlCannonHelper-release-x64
-          path: D:\a\PearlCannonHelper\PearlCannonHelper\PearlCannonHelper\x64\Release\
+          path: D:\a\PearlCannonHelpes\PearlCannonHelpers\PearlCannonHelper\x64\Release\
