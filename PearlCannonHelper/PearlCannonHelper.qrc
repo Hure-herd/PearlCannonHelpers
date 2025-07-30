@@ -1,0 +1,9 @@
+<RCC>
+    <qresource prefix="/PearlCannonHelper">
+        <file>exe_ico.ico</file>
+        <file>gear.ico</file>
+    </qresource>
+    <qresource prefix="/language">
+        <file>PearlCannonHelper_zh.qm</file>
+    </qresource>
+</RCC>
