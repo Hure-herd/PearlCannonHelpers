@@ -1,4 +1,4 @@
-﻿#include "PearlCannonHelper.h"
+#include "PearlCannonHelper.h"
 #include "Pearl.h"
 #include "StringHelper.h"
 #include "Constant.h"
@@ -35,6 +35,7 @@ PearlCannonHelper::PearlCannonHelper(QWidget *parent): QMainWindow(parent)
 	ui.pearlXLineEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
 	ui.pearlZLineEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
 	ui.PlayerYLineEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
+	ui.pearlYMotionEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
 
 	ui.motionXLineEdit_2->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
 	ui.motionYLineEdit_2->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
@@ -77,6 +78,7 @@ PearlCannonHelper::PearlCannonHelper(QWidget *parent): QMainWindow(parent)
 	connect(ui.pearlXLineEdit, SIGNAL(textEdited(QString)), this, SLOT(updatePearlInfo()));
 	connect(ui.pearlZLineEdit, SIGNAL(textEdited(QString)), this, SLOT(updatePearlInfo()));
 	connect(ui.PlayerYLineEdit, SIGNAL(textEdited(QString)), this, SLOT(updatePearlInfo()));
+	connect(ui.pearlYMotionEdit, SIGNAL(textEdited(QString)), this, SLOT(updatePearlInfo()));
 
 	connect(ui.motionXLineEdit_2, SIGNAL(textEdited(QString)), this, SLOT(updatePearlInfo()));
 	connect(ui.motionYLineEdit_2, SIGNAL(textEdited(QString)), this, SLOT(updatePearlInfo()));
@@ -161,6 +163,7 @@ void PearlCannonHelper::loadSetting()
 	ui.pearlXLineEdit->setText(settings.value("pearlX", ui.pearlXLineEdit->text()).toString());
 	ui.pearlZLineEdit->setText(settings.value("pearlZ", ui.pearlZLineEdit->text()).toString());
 	ui.PlayerYLineEdit->setText(settings.value("pearlY", ui.PlayerYLineEdit->text()).toString());
+	ui.pearlYMotionEdit->setText(settings.value("YMotion", ui.pearlYMotionEdit->text()).toString());
 	ui.motionXLineEdit_2->setText(settings.value("TNTMotionX", ui.motionXLineEdit_2->text()).toString());
 	ui.motionYLineEdit_2->setText(settings.value("TNTMotionY", ui.motionYLineEdit_2->text()).toString());
 	ui.motionZLineEdit_2->setText(settings.value("TNTMotionZ", ui.motionZLineEdit_2->text()).toString());
@@ -177,6 +180,7 @@ void PearlCannonHelper::saveSetting()
 	settings.setValue("pearlX", ui.pearlXLineEdit->text());
 	settings.setValue("pearlZ", ui.pearlZLineEdit->text());
 	settings.setValue("pearlY", ui.PlayerYLineEdit->text());;
+	settings.setValue("YMotion", ui.pearlYMotionEdit->text());;
 	settings.setValue("TNTMotionX", ui.motionXLineEdit_2->text());
 	settings.setValue("TNTMotionY", ui.motionYLineEdit_2->text());
 	settings.setValue("TNTMotionZ", ui.motionZLineEdit_2->text());;
