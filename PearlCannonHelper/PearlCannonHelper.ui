@@ -157,10 +157,10 @@
              </font>
             </property>
             <property name="maximum">
-             <number>1820</number>
+             <number>999999999</number>
             </property>
             <property name="value">
-             <number>1040</number>
+             <number>1820</number>
             </property>
            </widget>
           </item>
@@ -285,7 +285,7 @@
           </font>
          </property>
          <property name="text">
-          <string>0.602541821</string>
+          <string>0.6025678955</string>
          </property>
         </widget>
        </item>
@@ -348,7 +348,7 @@
           </font>
          </property>
          <property name="text">
-          <string>0.602541821</string>
+          <string>0.6025678955</string>
          </property>
         </widget>
        </item>
@@ -367,7 +367,7 @@
           </font>
          </property>
          <property name="text">
-          <string>-0.0022355</string>
+          <string>-0.001116290</string>
          </property>
         </widget>
        </item>
@@ -559,7 +559,7 @@
         </font>
        </property>
        <property name="text">
-        <string>113.345698</string>
+        <string>69.347226</string>
        </property>
       </widget>
       <widget class="QLineEdit" name="pearlZLineEdit">
@@ -584,7 +584,7 @@
         </font>
        </property>
        <property name="text">
-        <string>-55.9375</string>
+        <string>0.0625</string>
        </property>
        <property name="readOnly">
         <bool>false</bool>
@@ -680,7 +680,7 @@
         </font>
        </property>
        <property name="text">
-        <string>-155.0625</string>
+        <string>0.0625</string>
        </property>
        <property name="readOnly">
         <bool>false</bool>
@@ -767,7 +767,7 @@
         </font>
        </property>
        <property name="text">
-        <string>0.174457</string>
+        <string>0.27162786</string>
        </property>
        <property name="readOnly">
         <bool>false</bool>
