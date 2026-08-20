@@ -4,6 +4,7 @@
 #include "ui_PearlCannonHelper.h"
 #include "Setting.h"
 #include "Pearl.h"
+#include "ThrustDialog.h"
 
 struct SortingData
 {
@@ -28,6 +29,7 @@ public slots:
 	void on_languageComboBox_activated(int index);
 	void on_settingTableWidget_cellClicked(int, int);
 	void on_applyPushButton_pressed();
+	void on_thrustButton_clicked();
 	void generateTrace();
 	void updateSetting();
 	void updatePearlInfo();
@@ -40,9 +42,11 @@ private:
 	void loadSetting();
 	void saveSetting();
 	void updateResult();
+	void fitTableColumns(QTableWidget *tb);
 	Ui::PearlCannonHelperClass ui;
 	Setting setting;
 	QVector<SortingData> result;
 	bool flag_initializing;
 	int lastClickedSettingColumn;
+	vec3d m_thrusts[4]; // 0=西北, 1=东北, 2=西南, 3=东南
 };

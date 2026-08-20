@@ -102,13 +102,14 @@ QString Setting::toString()
 
 vec3d Setting::getThrustFromVec(const vec3d& baseThrust)const
 {
-	vec3d thrust_l = baseThrust * amount_l;
-	vec3d thrust_r = baseThrust * amount_r;
-	thrust_l.x *= Constant::sign_l[rotation][direction][0];
-	thrust_l.y *= Constant::sign_l[rotation][direction][1];
-	thrust_l.z *= Constant::sign_l[rotation][direction][2];
-	thrust_r.x *= Constant::sign_r[rotation][direction][0];
-	thrust_r.y *= Constant::sign_r[rotation][direction][1];
-	thrust_r.z *= Constant::sign_r[rotation][direction][2];
+	return getThrustFromVec2(baseThrust, baseThrust);
+}
+
+vec3d Setting::getThrustFromVec2(const vec3d& thrustL, const vec3d& thrustR)const
+{
+	// 四组 TNT 各自填带方向的完整推力向量，直接按数量加权，不再乘符号表
+	// （方向已由用户填写的正负号表达）
+	vec3d thrust_l = thrustL * amount_l;
+	vec3d thrust_r = thrustR * amount_r;
 	return thrust_l + thrust_r;
 }

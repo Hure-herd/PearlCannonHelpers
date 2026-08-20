@@ -39,9 +39,6 @@ PearlCannonHelper::PearlCannonHelper(QWidget *parent): QMainWindow(parent)
 	ui.PlayerYLineEdit->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
 	ui.pearlYMotionEdit->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
 
-	ui.motionXLineEdit_2->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
-	ui.motionYLineEdit_2->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
-	ui.motionZLineEdit_2->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
 
 	// 配置生成
 	ui.groundYLineEdit_2->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
@@ -49,11 +46,30 @@ PearlCannonHelper::PearlCannonHelper(QWidget *parent): QMainWindow(parent)
 
 	ui.tabWidget->setTabPosition(QTabWidget::South);
 	ui.traceTableWidget->verticalHeader()->setDefaultAlignment(Qt::AlignCenter);
-	ui.traceTableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-	ui.traceTableWidget->horizontalHeader()->setStretchLastSection(true);
+	// 内容自适应 + 剩余空间均分：内容少时填满表格，内容多时可横向滚动完整显示
+	ui.traceTableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
+	ui.traceTableWidget->horizontalHeader()->setStretchLastSection(false);
 	ui.settingTableWidget->verticalHeader()->setDefaultAlignment(Qt::AlignCenter);
-	ui.settingTableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-	ui.settingTableWidget->horizontalHeader()->setStretchLastSection(true);
+	// 内容自适应 + 剩余空间均分：内容少时填满表格，内容多时可横向滚动完整显示
+	ui.settingTableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
+	ui.settingTableWidget->horizontalHeader()->setStretchLastSection(false);
+
+	// 初始化四组 TNT 动量（默认与旧输入一致）
+	{
+		double tx = 0.6025678955;
+		double ty = 0.0;
+		double tz = 0.6025678955;
+		for (int g = 0; g < 4; g++) m_thrusts[g] = vec3d(tx, ty, tz);
+	}
+
+	// TNT给予动量组框内加"设置..."按钮
+	{
+		QPushButton *btn = new QPushButton(QStringLiteral("设置..."), ui.motionGroupBox_2);
+		btn->setObjectName(QStringLiteral("thrustButton"));
+		QGridLayout *lay = qobject_cast<QGridLayout *>(ui.motionGroupBox_2->layout());
+		if (lay) lay->addWidget(btn, 3, 0, 1, 2);
+		connect(btn, &QPushButton::clicked, this, &PearlCannonHelper::on_thrustButton_clicked);
+	}
 
 	loadSetting();
 	on_languageComboBox_activated(1);
@@ -82,9 +98,6 @@ PearlCannonHelper::PearlCannonHelper(QWidget *parent): QMainWindow(parent)
 	connect(ui.PlayerYLineEdit, SIGNAL(textEdited(QString)), this, SLOT(updatePearlInfo()));
 	connect(ui.pearlYMotionEdit, SIGNAL(textEdited(QString)), this, SLOT(updatePearlInfo()));
 
-	connect(ui.motionXLineEdit_2, SIGNAL(textEdited(QString)), this, SLOT(updatePearlInfo()));
-	connect(ui.motionYLineEdit_2, SIGNAL(textEdited(QString)), this, SLOT(updatePearlInfo()));
-	connect(ui.motionZLineEdit_2, SIGNAL(textEdited(QString)), this, SLOT(updatePearlInfo()));
 
 	connect(ui.settingTableWidget->horizontalHeader(), SIGNAL(sectionClicked(int)), this, SLOT(sortSettingTable(int)));
 
@@ -146,6 +159,7 @@ void PearlCannonHelper::generateTrace()
 			pearl.tick();
 		}
 	}
+	fitTableColumns(ui.traceTableWidget);
 }
 
 Pearl PearlCannonHelper::getPearl()
@@ -166,14 +180,18 @@ void PearlCannonHelper::loadSetting()
 	ui.pearlZLineEdit->setText(settings.value("pearlZ", ui.pearlZLineEdit->text()).toString());
 	ui.PlayerYLineEdit->setText(settings.value("pearlY", ui.PlayerYLineEdit->text()).toString());
 	ui.pearlYMotionEdit->setText(settings.value("YMotion", ui.pearlYMotionEdit->text()).toString());
-	ui.motionXLineEdit_2->setText(settings.value("TNTMotionX", ui.motionXLineEdit_2->text()).toString());
-	ui.motionYLineEdit_2->setText(settings.value("TNTMotionY", ui.motionYLineEdit_2->text()).toString());
-	ui.motionZLineEdit_2->setText(settings.value("TNTMotionZ", ui.motionZLineEdit_2->text()).toString());
 	ui.maxTNTSpinBox->setValue(settings.value("maxTNT", ui.maxTNTSpinBox->value()).toInt());
 	QString groundY = settings.value("groundY", ui.groundYLineEdit->text()).toString();
 	ui.groundYLineEdit->setText(groundY);
 	ui.groundYLineEdit_2->setText(groundY);
 	ui.maxTickLineEdit->setText(settings.value("maxTickTime", ui.maxTickLineEdit->text()).toString());
+	const char *grp[4] = { "NW", "NE", "SW", "SE" };
+	for (int g = 0; g < 4; g++)
+	{
+		m_thrusts[g].x = settings.value(QString("TNT_%1_X").arg(grp[g]), m_thrusts[g].x).toDouble();
+		m_thrusts[g].y = settings.value(QString("TNT_%1_Y").arg(grp[g]), m_thrusts[g].y).toDouble();
+		m_thrusts[g].z = settings.value(QString("TNT_%1_Z").arg(grp[g]), m_thrusts[g].z).toDouble();
+	}
 }
 
 void PearlCannonHelper::saveSetting()
@@ -183,24 +201,43 @@ void PearlCannonHelper::saveSetting()
 	settings.setValue("pearlZ", ui.pearlZLineEdit->text());
 	settings.setValue("pearlY", ui.PlayerYLineEdit->text());;
 	settings.setValue("YMotion", ui.pearlYMotionEdit->text());;
-	settings.setValue("TNTMotionX", ui.motionXLineEdit_2->text());
-	settings.setValue("TNTMotionY", ui.motionYLineEdit_2->text());
-	settings.setValue("TNTMotionZ", ui.motionZLineEdit_2->text());;
 	settings.setValue("maxTNT", ui.maxTNTSpinBox->value());
 	settings.setValue("groundY", ui.groundYLineEdit->text());
 	settings.setValue("maxTickTime", ui.maxTickLineEdit->text());
+	const char *grp[4] = { "NW", "NE", "SW", "SE" };
+	for (int g = 0; g < 4; g++)
+	{
+		settings.setValue(QString("TNT_%1_X").arg(grp[g]), m_thrusts[g].x);
+		settings.setValue(QString("TNT_%1_Y").arg(grp[g]), m_thrusts[g].y);
+		settings.setValue(QString("TNT_%1_Z").arg(grp[g]), m_thrusts[g].z);
+	}
+}
+
+void PearlCannonHelper::on_thrustButton_clicked()
+{
+	ThrustDialog dlg(m_thrusts, this);
+	if (dlg.exec() == QDialog::Accepted)
+	{
+		dlg.getValues(m_thrusts);
+		saveSetting();
+	}
 }
 
 void PearlCannonHelper::updatePearlInfo()
 {
-	double x = ui.motionXLineEdit_2->text().toDouble();
-	double y = ui.motionYLineEdit_2->text().toDouble();
-	double z = ui.motionZLineEdit_2->text().toDouble();
-	vec3d baseThrust(x, y, z);
+	// 轨迹模拟：按当前方向 d 选对应的两组 TNT（与搜索逻辑一致）
+	// 目标方向 S/W/E/N → 用目标反侧的两组 TNT
+	// S: NW(0)+NE(1)；W: NE(1)+SE(3)；E: NW(0)+SW(2)；N: SW(2)+SE(3)
+	const int mapL[4] = { 0, 1, 0, 2 };
+	const int mapR[4] = { 1, 3, 2, 3 };
+	int d = setting.direction;
+	if (d < 0 || d > 3) d = 0;
+	vec3d thrustL = m_thrusts[mapL[d]];
+	vec3d thrustR = m_thrusts[mapR[d]];
 
 	if (flag_initializing) return;
 	Pearl pearl = getPearl();
-	pearl.accelerate(setting.getThrustFromVec(baseThrust));
+	pearl.accelerate(setting.getThrustFromVec2(thrustL, thrustR));
 	bool isVersion1212Plus = (ui.directionComboBox_2->currentText() == "1.21.2+");
 	if (!ui.isStartFromExplosionCheckBox->isChecked())
 	{
@@ -266,6 +303,24 @@ void PearlCannonHelper::on_pasteBitPushButton_clicked()
 	QString text = QApplication::clipboard()->text();
 	tryLoadBitSeq(text);
 }
+void PearlCannonHelper::fitTableColumns(QTableWidget *tb)
+{
+	// 内容自适应后，若总宽小于表格宽度，把剩余空间平均分给各列（填满）
+	int cols = tb->columnCount();
+	if (cols <= 0) return;
+	tb->resizeColumnsToContents();
+	int totalW = 0;
+	for (int j = 0; j < cols; j++) totalW += tb->columnWidth(j);
+	int viewW = tb->viewport()->width();
+	if (totalW < viewW)
+	{
+		int extra = (viewW - totalW) / cols;
+		for (int j = 0; j < cols; j++)
+			tb->setColumnWidth(j, tb->columnWidth(j) + extra);
+	}
+	// 内容超宽时不拉伸，出现横向滚动条可完整滑动
+}
+
 void PearlCannonHelper::updateResult()
 {
 	QStringList column;
@@ -290,6 +345,7 @@ void PearlCannonHelper::updateResult()
 		for (int j = 0; j < ColumnCount; j++)
 			ui.settingTableWidget->item(i, j)->setTextAlignment(Qt::AlignCenter);
 	}
+	fitTableColumns(ui.settingTableWidget);
 }
 
 bool cmpDistance(const SortingData &a, const SortingData &b)
@@ -316,11 +372,11 @@ bool intersect(double a1, double a2, double b1, double b2)
 {
 	return max(a1, b1) < min(a2, b2);
 }
-bool inRange(int direction, double angle, double delta, const vec3d& baseThrust)
+bool inRange(int direction, double angle, double delta, const vec3d &tL, const vec3d &tR)
 {
-
-	double a1 = Setting(0, 1, direction, 0).getThrustFromVec(baseThrust).angle();
-	double a2 = Setting(1, 0, direction, 0).getThrustFromVec(baseThrust).angle();
+	// 方向 d 的推力 = i·tL + j·tR，角度范围由两个极端 (i=0,j=1) 和 (i=1,j=0) 决定
+	double a1 = Setting(0, 1, direction, 0).getThrustFromVec2(tL, tR).angle();
+	double a2 = Setting(1, 0, direction, 0).getThrustFromVec2(tL, tR).angle();
 	if (a2 < a1) swap(a1, a2);
 	if (abs(a2 - a1) > pi)
 	{
@@ -339,10 +395,8 @@ void PearlCannonHelper::on_genPushButton_clicked()
 	int maxTick = ui.maxTickLineEdit_2->text().toInt();
 	double groundY = ui.groundYLineEdit_2->text().toInt();
 
-	double x = ui.motionXLineEdit_2->text().toDouble();
-	double y = ui.motionYLineEdit_2->text().toDouble();
-	double z = ui.motionZLineEdit_2->text().toDouble();
-	vec3d baseThrust(x, y, z);
+	// 角度粗筛用的代表动量（四组的西北+东北平均，仅用于 inRange 判断方向可达性）
+	vec3d baseThrust = (m_thrusts[0] + m_thrusts[1]) * 0.5;
 
 	Pearl pearl0 = getPearl();
 	vec3d vec = vec3d(dstPosX, pearl0.getY(), dstPosZ) - pearl0.getPosition();
@@ -387,22 +441,29 @@ void PearlCannonHelper::on_genPushButton_clicked()
 
 	for (int d = 0; d < 4; d++)
 	{
-		if (!inRange(d, angle, delta, baseThrust)) continue;
+		// 方向 d 对应的两组 TNT：浅色位置 + 深色位置（0=西北,1=东北,2=西南,3=东南）
+		// 目标方向 S/W/E/N → 用目标反侧的两组 TNT
+		// S: NW(0)+NE(1)；W: NE(1)+SE(3)；E: NW(0)+SW(2)；N: SW(2)+SE(3)
+		const int mapL[4] = { 0, 1, 0, 2 };
+		const int mapR[4] = { 1, 3, 2, 3 };
+		vec3d thrustL = m_thrusts[mapL[d]];
+		vec3d thrustR = m_thrusts[mapR[d]];
+
+		if (!inRange(d, angle, delta, thrustL, thrustR)) continue;
 		bool isVersion1212Plus = (ui.directionComboBox_2->currentText() == "1.21.2+");
 		qDebug() << "Searching in direction " << d;
 
-		// 推力 = i*u + j*v（xz 平面），u/v 由方向 d 决定
-		vec3d u = vec3d(baseThrust.x * Constant::sign_l[Setting::rotation][d][0], 0,
-			baseThrust.z * Constant::sign_l[Setting::rotation][d][2]);
-		vec3d v = vec3d(baseThrust.x * Constant::sign_r[Setting::rotation][d][0], 0,
-			baseThrust.z * Constant::sign_r[Setting::rotation][d][2]);
+		// 推力 = i*u + j*v，u=浅色组完整推力向量, v=深色组完整推力向量
+		// （用户填的向量已带方向符号，不再乘 sign 表）
+		vec3d u = thrustL;
+		vec3d v = thrustR;
 
 		// tryPair：角度校验 + 下界剪枝 + 解析模拟 + top-100 插入
 		auto tryPair = [&](int i, int j) {
 			int p = 0;
 			Setting s = Setting(i, j, d, p);
 			cnt++;
-			vec3d thrust = s.getThrustFromVec(baseThrust);
+			vec3d thrust = s.getThrustFromVec2(thrustL, thrustR);
 			double a = thrust.angle();
 			if (!(a1 < a && a < a2 || a1 < a + 2 * pi && a + 2 * pi < a2 || a1 < a - 2 * pi && a - 2 * pi < a2))
 				return;

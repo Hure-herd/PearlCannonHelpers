@@ -12,7 +12,8 @@ SOURCES += \
     Setting.cpp \
     StringHelper.cpp \
     Constant.cpp \
-    vec3d.cpp
+    vec3d.cpp \
+    ThrustDialog.cpp
 
 HEADERS += \
     PearlCannonHelper.h \
@@ -20,7 +21,8 @@ HEADERS += \
     Setting.h \
     StringHelper.h \
     Constant.h \
-    vec3d.h
+    vec3d.h \
+    ThrustDialog.h
 
 FORMS += \
     PearlCannonHelper.ui

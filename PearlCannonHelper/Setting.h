@@ -14,6 +14,7 @@ public:
 	~Setting();
 	QString toString();
 	vec3d getThrustFromVec(const vec3d& baseThrust) const;
+	vec3d getThrustFromVec2(const vec3d& thrustL, const vec3d& thrustR) const;
 
 	int amount_l, amount_r, direction, pitch;
 };
