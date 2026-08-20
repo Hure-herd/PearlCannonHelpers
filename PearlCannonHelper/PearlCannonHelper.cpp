@@ -9,6 +9,8 @@
 #include <QSettings>
 #include <QDebug>
 #include <cmath>
+#include <algorithm>
+#include <algorithm>
 using namespace std;
 
 
@@ -20,30 +22,30 @@ PearlCannonHelper::PearlCannonHelper(QWidget *parent): QMainWindow(parent)
 	ui.setupUi(this);
 
 	// 珍珠状态
-	ui.posXLineEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
-	ui.posYLineEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
-	ui.posZLineEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
-	ui.motionXLineEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
-	ui.motionYLineEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
-	ui.motionZLineEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
+	ui.posXLineEdit->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
+	ui.posYLineEdit->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
+	ui.posZLineEdit->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
+	ui.motionXLineEdit->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
+	ui.motionYLineEdit->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
+	ui.motionZLineEdit->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
 
 	// 输出条件
-	ui.groundYLineEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
-	ui.maxTickLineEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expIntNumber), this));
+	ui.groundYLineEdit->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
+	ui.maxTickLineEdit->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expIntNumber), this));
 
 	// 珍珠炮信息
-	ui.pearlXLineEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
-	ui.pearlZLineEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
-	ui.PlayerYLineEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
-	ui.pearlYMotionEdit->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
+	ui.pearlXLineEdit->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
+	ui.pearlZLineEdit->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
+	ui.PlayerYLineEdit->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
+	ui.pearlYMotionEdit->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
 
-	ui.motionXLineEdit_2->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
-	ui.motionYLineEdit_2->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
-	ui.motionZLineEdit_2->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
+	ui.motionXLineEdit_2->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
+	ui.motionYLineEdit_2->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
+	ui.motionZLineEdit_2->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
 
 	// 配置生成
-	ui.groundYLineEdit_2->setValidator(new QRegExpValidator(QRegExp(StringHelper::expRealNumber), this));
-	ui.maxTickLineEdit_2->setValidator(new QRegExpValidator(QRegExp(StringHelper::expIntNumber), this));
+	ui.groundYLineEdit_2->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expRealNumber), this));
+	ui.maxTickLineEdit_2->setValidator(new QRegularExpressionValidator(QRegularExpression(StringHelper::expIntNumber), this));
 
 	ui.tabWidget->setTabPosition(QTabWidget::South);
 	ui.traceTableWidget->verticalHeader()->setDefaultAlignment(Qt::AlignCenter);
@@ -346,75 +348,225 @@ void PearlCannonHelper::on_genPushButton_clicked()
 	vec3d vec = vec3d(dstPosX, pearl0.getY(), dstPosZ) - pearl0.getPosition();
 	double angle = vec.angle();
 	double delta = 10.0 / maxTNT;
+	// 角度窗口下限保护：maxTNT 很大时 10/maxTNT 会窄到 0.0000x rad，
+	// 远小于整数网格的角度分辨率，导致射程匹配的组合被漏搜。
+	if (delta < 0.005) delta = 0.005;
 	double a1 = angle - delta;
 	double a2 = angle + delta;
 	QVector<SortingData> srt;
 	int cnt = 0;
+	// 预计算 0.99^t 查表（pow 太慢，查表 O(1)）
+	const double R = 0.99;
+	QVector<double> rpow(maxTick + 1);
+	rpow[0] = 1.0;
+	for (int t = 1; t <= maxTick; t++) rpow[t] = rpow[t - 1] * R;
+	const double SR = 100.0; // 1/(1-R)
+	const double lnR = log(R);
+
+	// 目标水平距离
+	double D_target = sqrt((dstPosX - pearl0.getX()) * (dstPosX - pearl0.getX()) + (dstPosZ - pearl0.getZ()) * (dstPosZ - pearl0.getZ()));
+	// 落地 tick（用近似 mvy，忽略推力 Y 分量影响）
+	double mvyA = pearl0.getMy();
+	double CA0 = 300.0, gA0 = 3.0;
+	if (ui.directionComboBox_2->currentText() == "1.21.2+") { CA0 = 297.0; gA0 = 2.97; }
+	double YCA = SR * mvyA + CA0;
+	auto yAtA = [&](int t) -> double { return pearl0.getY() + YCA * (1 - rpow[t]) - gA0 * t; };
+	int T_land = maxTick;
+	if (yAtA(maxTick) < groundY)
+	{
+		int lo = 1, hi = maxTick;
+		while (lo < hi) { int mid = (lo + hi) >> 1; if (yAtA(mid) < groundY) hi = mid; else lo = mid + 1; }
+		T_land = lo - 1;
+		if (T_land < 1) T_land = 1;
+	}
+	double K = (1.0 - rpow[T_land]) / (1.0 - R); // 落地前水平位移系数（约 26）
+	double eps = max(100.0, D_target * 0.002);
+	// 射程窗口：|V| ∈ [D/K, D+eps]（tick=T_land 命中 ~ tick=1 命中）
+	double Rlo = D_target / K, Rhi = D_target + eps;
+	double Rlo2 = Rlo * Rlo, Rhi2 = Rhi * Rhi;
+
 	for (int d = 0; d < 4; d++)
-		if (inRange(d, angle, delta, baseThrust))
-		{
-			bool isVersion1212Plus = (ui.directionComboBox_2->currentText() == "1.21.2+");
-			qDebug() << "Searching in direction " << d;
-			for (int i = 0; i <= maxTNT; i++)
+	{
+		if (!inRange(d, angle, delta, baseThrust)) continue;
+		bool isVersion1212Plus = (ui.directionComboBox_2->currentText() == "1.21.2+");
+		qDebug() << "Searching in direction " << d;
+
+		// 推力 = i*u + j*v（xz 平面），u/v 由方向 d 决定
+		vec3d u = vec3d(baseThrust.x * Constant::sign_l[Setting::rotation][d][0], 0,
+			baseThrust.z * Constant::sign_l[Setting::rotation][d][2]);
+		vec3d v = vec3d(baseThrust.x * Constant::sign_r[Setting::rotation][d][0], 0,
+			baseThrust.z * Constant::sign_r[Setting::rotation][d][2]);
+
+		// tryPair：角度校验 + 下界剪枝 + 解析模拟 + top-100 插入
+		auto tryPair = [&](int i, int j) {
+			int p = 0;
+			Setting s = Setting(i, j, d, p);
+			cnt++;
+			vec3d thrust = s.getThrustFromVec(baseThrust);
+			double a = thrust.angle();
+			if (!(a1 < a && a < a2 || a1 < a + 2 * pi && a + 2 * pi < a2 || a1 < a - 2 * pi && a - 2 * pi < a2))
+				return;
+			// 下界剪枝：目标到射程线段 [P0, P0+100V] 的最短距离 > 当前第100名 → 跳过
+			if (srt.size() >= 100)
 			{
-				bool flag_success = false, flag_break = false;
-				for (int j = 0; !flag_break && j <= maxTNT; j++)
-					//for (int p = 0; !flag_break && p < 2; p++)
+				double px0 = pearl0.getX(), pz0 = pearl0.getZ();
+				double vx = thrust.x * 100, vz = thrust.z * 100;
+				double dx = dstPosX - px0, dz = dstPosZ - pz0;
+				double L2 = vx * vx + vz * vz;
+				if (L2 > 1e-30)
+				{
+					double tt = (dx * vx + dz * vz) / L2;
+					if (tt < 0) tt = 0; else if (tt > 1) tt = 1;
+					double lx = dstPosX - (px0 + tt * vx);
+					double lz = dstPosZ - (pz0 + tt * vz);
+					double lb = sqrt(lx * lx + lz * lz);
+					if (lb > srt.back().dis) return;
+				}
+			}
+			// ===== 解析模拟 =====
+			double px0 = pearl0.getX(), py0 = pearl0.getY(), pz0 = pearl0.getZ();
+			double mvx = pearl0.getMx() + thrust.x;
+			double mvy = pearl0.getMy() + thrust.y;
+			double mvz = pearl0.getMz() + thrust.z;
+			double C = 300.0, g = 3.0;
+			if (isVersion1212Plus) { C = 297.0; g = 2.97; }
+			// 落地 tick T（y(T) >= groundY 的最大 tick）
+			int T = maxTick;
+			{
+				double YC = SR * mvy + C;
+				auto yAtI = [&](int t) -> double { return py0 + YC * (1 - rpow[t]) - g * t; };
+				if (yAtI(maxTick) < groundY)
+				{
+					int lo = 1, hi = maxTick;
+					while (lo < hi)
 					{
-						int p = 0;
-						Setting s = Setting(i, j, d, p);
-						cnt++;
-						double a = s.getThrustFromVec(baseThrust).angle();
-						if (!(a1 < a && a < a2 || a1 < a + 2 * pi && a + 2 * pi < a2 || a1 < a - 2 * pi && a - 2 * pi < a2))
-						{
-							if (flag_success) flag_break = true;
-							continue;
-						}
-						flag_success = true;
-						Pearl pearl = pearl0;
-						pearl.accelerate(s.getThrustFromVec(baseThrust));
-						double mn = 1e10;
-						SortingData best = SortingData{mn, pearl.getPosition(), -1, s};
-						for (int tick = 0; tick < maxTick; tick++)
-						{
-							if (isVersion1212Plus) {
-								pearl.tick2();
-								if (pearl.getY() < groundY) break;
-								double dis = pearl.getPosition().distance(vec3d(dstPosX, pearl.getY(), dstPosZ));
-								if (dis < mn)
-								{
-									mn = dis;
-									best = SortingData{ mn, pearl.getPosition(), tick + 1, s,directionToString(d) };
-								}
-								else
-								{
-									break;
-								}
-							}
-							else {
-								pearl.tick();
-								if (pearl.getY() < groundY) break;
-								double dis = pearl.getPosition().distance(vec3d(dstPosX, pearl.getY(), dstPosZ));
-								if (dis < mn)
-								{
-									mn = dis;
-									best = SortingData{ mn, pearl.getPosition(), tick + 1, s,directionToString(d) };
-								}
-								else
-								{
-									break;
-								}
-							}
-						}
-						if (mn != 1e10) srt.push_back(best);
+						int mid = (lo + hi) >> 1;
+						if (yAtI(mid) < groundY) hi = mid; else lo = mid + 1;
 					}
+					T = lo - 1;
+					if (T < 1) return; // 首 tick 即落地
+				}
+			}
+			// 射程线段端点 P_end = P0 + V*SR
+			double ex = px0 + mvx * SR, ez = pz0 + mvz * SR;
+			double dx = ex - px0, dz = ez - pz0;
+			double L2 = dx * dx + dz * dz;
+			double mn = 1e10;
+			SortingData best = SortingData{mn, pearl0.getPosition(), -1, s};
+			if (L2 > 1e-30)
+			{
+				double proj = ((dstPosX - px0) * dx + (dstPosZ - pz0) * dz) / L2;
+				double tstar = 1.0;
+				if (proj > 0 && proj < 1)
+				{
+					tstar = log(1.0 - proj) / lnR;
+					if (tstar < 1) tstar = 1;
+					if (tstar > T) tstar = T;
+				}
+				else if (proj >= 1)
+				{
+					tstar = T;
+				}
+				for (int tt = (int)floor(tstar) - 1; tt <= (int)ceil(tstar) + 1; tt++)
+				{
+					if (tt < 1 || tt > T) continue;
+					double q = rpow[tt];
+					double px = px0 + mvx * SR * (1 - q);
+					double pz = pz0 + mvz * SR * (1 - q);
+					double py = py0 + (SR * mvy + C) * (1 - q) - g * tt;
+					double dis = sqrt((px - dstPosX) * (px - dstPosX) + (pz - dstPosZ) * (pz - dstPosZ));
+					if (dis < mn)
+					{
+						mn = dis;
+						best = SortingData{ mn, vec3d(px, py, pz), tt, s, directionToString(d) };
+					}
+				}
+			}
+			if (mn != 1e10)
+			{
+				if (srt.size() < 100 || best.dis < srt.back().dis)
+				{
+					auto it = std::lower_bound(srt.begin(), srt.end(), best,
+						[](const SortingData &a, const SortingData &b) { return a.dis < b.dis; });
+					srt.insert(it, best);
+					if (srt.size() > 100) srt.pop_back();
+				}
+			}
+		};
+
+		// ===== 方向方程搜索（射程窗口限制 i 范围）=====
+		// 推力方向 = 目标方向：j·(vz·cosA - vx·sinA) = i·(ux·sinA - uz·cosA)
+		// 即 j = i·kuA/kvA（O(1) 唯一解）；不同 i → 不同 |V| → 不同命中 tick，天然全覆盖
+		// 命中条件：|V|·S·(1-r^t) = D ⇒ |V| ∈ [D/K, D]（tick=T_land 到 tick=1）
+		// 而 |V(i, j*)| = C·i（C 为常数），所以 i 只需扫 [D/(K·C), D/C]，其余射程不匹配直接跳过
+		double kvA = v.z * cos(angle) - v.x * sin(angle);
+		double kuA = u.x * sin(angle) - u.z * cos(angle);
+		if (fabs(kvA) > 1e-12)
+		{
+			// 非退化：按 tick 枚举直接解析 i（与退化分支同理）
+			// 珍珠飞 t tick 水平位移 = |V|·S·(1-r^t)，命中目标需 = D_target
+			// j* = α·i ⇒ |V| = C·i（C = |u+α·v|）⇒ i = D/(C·S·(1-r^t))，每个整数 tick 唯一解
+			double alpha = kuA / kvA;
+			double ux2 = u.x + alpha * v.x, uz2 = u.z + alpha * v.z;
+			double Cv = sqrt(ux2 * ux2 + uz2 * uz2);
+			if (Cv > 1e-12)
+			{
+				for (int t = 1; t <= T_land; t++)
+				{
+					double denom = Cv * SR * (1.0 - rpow[t]);
+					if (denom < 1e-12) continue;
+					double it = D_target / denom;
+					int i0 = (int)floor(it);
+					for (int i = i0 - 3; i <= i0 + 3; i++)
+					{
+						if (i < 0 || i > maxTNT) continue;
+						double jstar = i * alpha;
+						int j0 = (int)floor(jstar);
+						for (int j = j0 - 2; j <= j0 + 2; j++)
+						{
+							if (j < 0 || j > maxTNT) continue;
+							tryPair(i, j);
+						}
+					}
+				}
 			}
 		}
+		else
+		{
+			// 退化（v 平行目标方向，如 45° 目标）：按 tick 枚举直接解析 j
+			// 珍珠飞行 t tick 的水平位移 = |V|·S·(1-r^t)，命中目标需 = D_target
+			// i=0 时 |V| = j·|v| ⇒ j = D_target / (S·|v|·(1-r^t))，对每个整数 tick 唯一解
+			// 只需扫 j_t ± 容差（覆盖离散化与 i 微调），tick 1..T_land 全覆盖
+			double a_q = v.x * v.x + v.z * v.z;
+			double vNorm = sqrt(a_q);
+			// i 微调容差：i=0 方向精确对准；扫 i=0..2 覆盖退化时的微小偏差
+			int iMax = min(maxTNT, 2);
+			for (int t = 1; t <= T_land; t++)
+			{
+				double denom = SR * vNorm * (1.0 - rpow[t]);
+				if (denom < 1e-12) continue;
+				double jt = D_target / denom;
+				int j0 = (int)floor(jt);
+				for (int j = j0 - 3; j <= j0 + 3; j++)
+				{
+					if (j < 0 || j > maxTNT) continue;
+					for (int i = 0; i <= iMax; i++)
+						tryPair(i, j);
+				}
+			}
+			// 兜底：小 maxTNT 或异常时也扫射程窗口起点附近的 j
+			double jLoGuard = max(0, (int)floor(Rlo / vNorm) - 5);
+			double jHiGuard = min((double)maxTNT, ceil(Rhi / vNorm) + 5);
+			for (int j = (int)jLoGuard; j <= (int)jHiGuard && j - (int)jLoGuard < 11; j++)
+				tryPair(0, j);
+		}
+	}
+
 	qDebug() << srt.size() << ' ' << cnt;
 
 	sort(srt.begin(), srt.end(), cmpDistance);
 	result.clear();
-	for (int i = 0; i < min(srt.size(), 100); i++) result.push_back(srt[i]);
+	for (int i = 0; i < min((int)srt.size(), 100); i++) result.push_back(srt[i]);
 	updateResult();
 	lastClickedSettingColumn = 0;
 }

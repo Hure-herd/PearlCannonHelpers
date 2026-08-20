@@ -1,0 +1,30 @@
+# Qt / qmake
+Makefile
+Makefile.Debug
+Makefile.Release
+*.o
+*.obj
+*.res
+*.pdb
+*.ilk
+*.user
+
+# Qt build dirs
+debug/
+release/
+GeneratedFiles/
+PearlCan.B12702AD/
+enc_temp_folder/
+.qmake.stash
+
+# VS
+.vs/
+x64/
+*.suo
+*.VC.db
+
+# IDE
+CppProperties.json
+*.lnk
+ui_PearlCannonHelper.h
+
